@@ -11,7 +11,7 @@ import AuthNavigator from "./src/navigation/AuthNavigator";
 import MainNavigator from "./src/navigation/MainNavigator";
 import { LoadingScreen } from "./src/screens/LoadingScreen";
 
-import { Client } from "./src/services/api";
+import { Client, initClient } from "./src/services/api";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,9 +20,32 @@ export default function App() {
   useEffect(() => {
     const autoLogin = async () => {
       try {
-        const client = Client();
-        const res = await client.whoami();
-        setIsLoggedIn(res.ok);
+        const accessToken = await AsyncStorage.getItem("access_token");
+        const refreshToken = await AsyncStorage.getItem("refresh_token");
+        const deviceId = await AsyncStorage.getItem("device_id");
+        const userId = await AsyncStorage.getItem("user_id");
+
+        const client = initClient(accessToken, deviceId, userId);
+
+        try {
+          await client.whoami();
+          setIsLoggedIn(true);
+          client.startClient();
+        } catch (err) {
+          if (refreshToken) {
+            const res = await client.refreshToken(refreshToken);
+
+            await AsyncStorage.setItem("access_token", res.access_token);
+            await AsyncStorage.setItem("refresh_token", res.refresh_token);
+
+            client.setAccessToken(res.access_token);
+
+            setIsLoggedIn(true);
+            client.startClient();
+          } else {
+            throw err;
+          }
+        }
       } catch (err) {
         setIsLoggedIn(false);
       } finally {

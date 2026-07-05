@@ -23,32 +23,28 @@ export const InboxListScreen = () => {
   useEffect(() => {
     const getRooms = async () => {
       try {
-        const rooms = client.getRooms().filter(room => {
-          const me = room.getMember(client.getUserId());
-          return me?.membership === "join";
-        });
+        const directRoomsContent = await client.getAccountData("m.direct")?.getContent() || {};
+        const directRooms = Object.entries(directRoomsContent).flatMap(
+          ([userId, roomIds]) => {
+            return roomIds.map(async (roomId) => {
+              const room = await client.getRoom(roomId);
 
-        const joinedRooms = await Promise.all(
-          rooms.map(async (room) => {
-            const avatarEvent = room.currentState.getStateEvents(
-              "m.room.avatar",
-              ""
-            );
-
-            const mxc = avatarEvent?.getContent()?.url || null;
-
-            const avatar = mxc
-              ? await mxcUrlToImageV1(mxc, 64, 64, "scale")
-              : null;
-
-            return {
-              room,
-              avatar,
-            };
-          })
+              const user_profile = await client.getProfileInfo(userId);
+              const avatar = await mxcUrlToImageV1(user_profile?.avatar_url, 64, 64, "scale");
+              const displayname = user_profile?.displayname;
+              return {
+                roomId,
+                room,
+                userId,
+                avatar,
+                displayname
+              };
+            });
+          }
         );
 
-        setJoinedRooms(joinedRooms);
+        const resolveJoinedRooms = await Promise.all(directRooms);
+        setJoinedRooms(resolveJoinedRooms);
       } catch (err) {
         Alert.alert("Network Error", err?.errmsg || "Check your connection.");
       } finally {
@@ -58,6 +54,8 @@ export const InboxListScreen = () => {
 
     getRooms();
   }, []);
+
+  console.log(joinedRooms);
 
   if (isLoading) {
     return (<LoadingScreen/>);
@@ -77,7 +75,7 @@ export const InboxListScreen = () => {
       <View style={styles.content}>
         <View style={styles.topRow}>
           <Text style={styles.name}>
-            {item.room.name}
+            {item.displayname}
           </Text>
           <Text style={styles.time}>
             {formatTime(item.timestamp)}

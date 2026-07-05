@@ -20,8 +20,6 @@ export default function LoginScreen({ navigation, onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
-    initClient();
-
     if (!username || !password) {
       Alert.alert("Error", "All fields are required");
       return;
